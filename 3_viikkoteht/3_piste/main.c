@@ -1,3 +1,7 @@
+// perustelut pisteille: suoritin tehtävän mukaiset tehtävät
+
+
+
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/device.h>
