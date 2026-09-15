@@ -223,11 +223,10 @@ void green_task(void *, void *, void*) {
 		// 2. Asetetaan ledit päälle 
 		gpio_pin_set_dt(&green,1);
 		printk("Green on\n");
-		// 2. Annetaan valojen olla päällä sekunti
+		// 3. Annetaan valojen olla päällä sekunti
 		k_sleep(K_SECONDS(1));
 		gpio_pin_set_dt(&green, 0);
 		k_sem_give(&release_sem); 
-
 		// Sleep nor yield not needed
 		// k_yield();
 	}
@@ -245,7 +244,6 @@ void yellow_task(void *, void *, void*) {
 		gpio_pin_set_dt(&red,0);
 		gpio_pin_set_dt(&green,0);
 		k_sem_give(&release_sem); 
-
 	}
 }
 
@@ -258,7 +256,7 @@ void red_task(void *, void *, void*) {
  		// 2. Asetetaan ledit päälle 
 		gpio_pin_set_dt(&red,1);
 		printk("Red on\n");
-		// 2. Annetaan valojen olla päällä sekunti
+		// 3. Annetaan valojen olla päällä sekunti
 		k_sleep(K_SECONDS(1));
 		gpio_pin_set_dt(&red, 0);
 		// semafori
