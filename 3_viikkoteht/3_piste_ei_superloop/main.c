@@ -185,7 +185,6 @@ static void dispatcher_task(void *unused1, void *unused2, void *unused3)
 		    switch(color) {
         		case 'R':
             		//k_condvar_broadcast(&red_signal);
-
 					k_thread_create(
   					&red_thread_data,
     				red_stack,
@@ -230,8 +229,6 @@ static void dispatcher_task(void *unused1, void *unused2, void *unused3)
 					);
             		break;
     	}
-
-    //k_sem_take(&release_sem, K_FOREVER);
 	}
 }
 
