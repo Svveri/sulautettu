@@ -1,3 +1,9 @@
+// PERUSTELU: Kolmen pisteen perusteluni on, lisäsin sekvenssin toiston "T" kirjaimella, 
+// refaktoroin ohjelman, jotta ei käytetä while rakennetta ledi taskeissa sekä suoritin jo 1p suorituksen eli sekvenssin.
+
+
+
+
 #include <zephyr/kernel.h>
 #include <zephyr/sys/printk.h>
 #include <zephyr/device.h>
@@ -5,7 +11,7 @@
 #include <zephyr/drivers/uart.h>
 
 // Thread initializations
-#define STACKSIZE 500
+#define STACKSIZE 1024
 #define PRIORITY 5
 
 // Led pin configurations // led0 on red, led1 on green ja led2 on blue
@@ -24,7 +30,7 @@ void green_task(void *, void *, void *);
 void yellow_task(void *, void *, void *);
 
 // globaali muuttuja ledi aikaa varten
-volatile int led_time_ms = 0;
+int led_time_ms = 1000;
 
 // semafori
 K_SEM_DEFINE(release_sem, 0, 1);
@@ -35,9 +41,6 @@ K_SEM_DEFINE(release_sem, 0, 1);
  * to prj.conf
  ****************************/
 
-
-
-// LED task init, tätä käytetään jos halutaan heti käynnistää taskit
 
 // UART initialization
 #define UART_DEVICE_NODE DT_CHOSEN(zephyr_shell_uart)
@@ -133,7 +136,6 @@ static void uart_task(void *unused1, void *unused2, void *unused3)
 			// Character is newline, copy dispatcher data and put to FIFO buffer
 			} else {
 				printk("UART msg: %s\n", uart_msg);
-                
 				struct data_t *buf = k_malloc(sizeof(struct data_t));
 				if (buf == NULL) {
 					return;
@@ -148,15 +150,11 @@ static void uart_task(void *unused1, void *unused2, void *unused3)
 				// Clear UART receive buffer
 				uart_msg_cnt = 0;
 				memset(uart_msg,0,20);
-
-				// Clear UART message buffer
-				uart_msg_cnt = 0;
-				memset(uart_msg,0,20);
 			}
 		}
 		k_msleep(10);
 	}
-	return 0;
+	return;
 }
 
 /********************
@@ -173,73 +171,52 @@ static void dispatcher_task(void *unused1, void *unused2, void *unused3)
 
 		printk("Dispatcher: %s\n", sequence);
 
+		// sekvenssin seuranta muuttuja
 		int cnt = 0;
 
-		//	Muuttujat väriä ja aikaa varten
+		//	Muuttuja väriä varten 
 		char color;
-		int time_ms;
 
-		if (sscanf(sequence, "%c,%d", &color, &time_ms) == 2) {
-    		led_time_ms = time_ms;
-
+		while (sequence[cnt] != 0) {
+		    color = sequence[cnt];
 		    switch(color) {
         		case 'R':
-            		//k_condvar_broadcast(&red_signal);
-					k_thread_create(
-  					&red_thread_data,
-    				red_stack,
-    				STACKSIZE,
-				    red_task,
-				    NULL,
-				    NULL,
-				    NULL,
-				    PRIORITY,
-				    0,
-				    K_NO_WAIT
-					);
+					k_thread_create(&red_thread_data,red_stack,STACKSIZE,red_task,NULL,NULL,NULL,PRIORITY,0,K_NO_WAIT);
+					k_sem_take(&release_sem, K_FOREVER);
             		break;
         		case 'G':
-            		//k_condvar_broadcast(&green_signal);
-					k_thread_create(
-  					&green_thread_data,
-    				green_stack,
-    				STACKSIZE,
-				    green_task,
-				    NULL,
-				    NULL,
-				    NULL,
-				    PRIORITY,
-				    0,
-				    K_NO_WAIT
-					);
+					k_thread_create(&green_thread_data,green_stack,STACKSIZE,green_task,NULL,NULL,NULL,PRIORITY,0,K_NO_WAIT);
+					k_sem_take(&release_sem, K_FOREVER);
             		break;
         		case 'Y':
-            		//k_condvar_broadcast(&yellow_signal);
-					k_thread_create(
-  					&yellow_thread_data,
-    				yellow_stack,
-    				STACKSIZE,
-				    yellow_task,
-				    NULL,
-				    NULL,
-				    NULL,
-				    PRIORITY,
-				    0,
-				    K_NO_WAIT
-					);
+					k_thread_create(&yellow_thread_data,yellow_stack,STACKSIZE,yellow_task,NULL,NULL,NULL,PRIORITY,0,K_NO_WAIT);
+					k_sem_take(&release_sem, K_FOREVER);
             		break;
-    	}
+				case 'T': // toistetaan aikaisempi ledi sekvenssi samassa järjestyksessä
+					printk("Repeating sequence\n");
+					// toistetaan aikaisempi ledi sekvenssi samassa järjestyksessä
+					for (int i = 0; i < cnt; i++) {
+						char repeat_color = sequence[i];
+						switch(repeat_color) {
+							case 'R':
+								k_thread_create(&red_thread_data,red_stack,STACKSIZE,red_task,NULL,NULL,NULL,PRIORITY,0,K_NO_WAIT);
+								k_sem_take(&release_sem, K_FOREVER);
+								break;
+							case 'G':
+								k_thread_create(&green_thread_data,green_stack,STACKSIZE,green_task,NULL,NULL,NULL,PRIORITY,0,K_NO_WAIT);
+								k_sem_take(&release_sem, K_FOREVER);
+								break;
+							case 'Y':
+								k_thread_create(&yellow_thread_data,yellow_stack,STACKSIZE,yellow_task,NULL,NULL,NULL,PRIORITY,0,K_NO_WAIT);
+								k_sem_take(&release_sem, K_FOREVER);
+								break;
+						}
+					}
+					break;
+				}			
+			cnt++;
+		}
 	}
-}
-
-		// You need to:
-        // Parse color and time from the fifo data
-        // Example
-        //    char color = sequence[0];
-        //    int time = atoi(sequence+2);
-		//    printk("Data: %c %d\n", color, time);
-        // Send the parsed color information to tasks using fifo
-        // Use release signal to control sequence or k_yield
 }
 
 // muiden threadien define
@@ -256,6 +233,7 @@ void green_task(void *, void *, void*) {
 		// 2. Annetaan valojen olla päällä x määrä
 		k_msleep(led_time_ms);
 		gpio_pin_set_dt(&green, 0);
+		// Otetaan lukko pois
 		k_sem_give(&release_sem);
 }
 
@@ -283,5 +261,5 @@ void red_task(void *, void *, void*) {
 		k_msleep(led_time_ms);
 		gpio_pin_set_dt(&red, 0);
 		// Otetaan lukko pois
-		k_sem_give(&release_sem); 
+		k_sem_give(&release_sem);
 }
